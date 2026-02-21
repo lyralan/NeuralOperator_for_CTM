@@ -1,0 +1,76 @@
+neural-transport-operators/
+  README.md
+  pyproject.toml            # or requirements.txt + environment.yml
+  configs/
+    data.yaml
+    train_fno.yaml
+    train_unet.yaml
+    train_hybrid.yaml
+    inverse.yaml
+  src/
+    ntops/
+      __init__.py
+
+      # --- PDE simulation ---
+      pde/
+        __init__.py
+        grid.py              # grid, FFT helpers, boundary conditions
+        fields.py            # wind fields, sources, init conditions
+        solver_fd.py         # finite-difference solver (baseline)
+        solver_spectral.py   # optional spectral/FFT solver
+        integrators.py       # RK2/RK4, semi-Lagrangian (optional)
+        metrics.py           # mass error, spectral error, rollout error
+
+      # --- Datasets ---
+      data/
+        __init__.py
+        generate.py          # dataset generation entrypoints
+        io.py                # zarr/npz read/write
+        dataset.py           # PyTorch Dataset objects
+        transforms.py        # normalization, augmentations
+
+      # --- Models ---
+      models/
+        __init__.py
+        fno.py               # Fourier Neural Operator
+        unet.py              # baseline
+        cnn.py               # baseline
+        hybrid.py            # physics + learned module
+        layers.py            # spectral conv, padding, etc.
+
+      # --- Training / evaluation ---
+      train/
+        __init__.py
+        loop.py              # generic train loop
+        losses.py
+        optim.py
+        eval.py              # one-step and rollout evaluation
+        rollout.py           # long-horizon simulation with model
+
+      # --- Inverse problem + gradient fidelity ---
+      inverse/
+        __init__.py
+        objectives.py        # defines J(S)
+        gradients.py         # true vs surrogate gradients
+        solve_inverse.py     # gradient descent / L-BFGS on S
+        compare.py           # cosine similarity, etc.
+
+      # --- Utilities ---
+      utils/
+        __init__.py
+        seed.py
+        logging.py
+        plotting.py
+        checkpointing.py
+
+  scripts/
+    make_data.py
+    train.py
+    eval_rollout.py
+    run_inverse.py
+    make_figures.py
+
+  tests/
+    test_solver_conservation.py
+    test_advection_translation.py
+    test_gradients_fdcheck.py
