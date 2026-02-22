@@ -7,3 +7,4 @@ outputs/
 *.npz
 *.pt
 *.pth
+*.egg-info/
