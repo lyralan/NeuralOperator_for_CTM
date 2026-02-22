@@ -18,6 +18,7 @@ train:
   seed: 0
   plot_predictions: true
   plot_dir: outputs
+  checkpoint_path: outputs/best.pt
   num_workers: 24
   pin_memory: false
   scheduler:

@@ -1,0 +1,8 @@
+# Rollout evaluation config
+model_config: configs/train_fno.yaml
+checkpoint: outputs/best.pt
+# data config to get dt/nsteps/grid
+pde_config: configs/data.yaml
+rollout_steps: 5
+sample_indices: [0, 1, 2]
+device: cpu

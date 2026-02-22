@@ -77,6 +77,9 @@ def main():
             val_ds.set_stats(stats)
             val_ds.set_normalize(True)
 
+    ckpt_path = cfg["train"].get("checkpoint_path", "outputs/best.pt")
+    os.makedirs(os.path.dirname(ckpt_path), exist_ok=True)
+
     num_workers = cfg["train"].get("num_workers", 0)
     pin_memory = cfg["train"].get("pin_memory", False)
     train_loader = DataLoader(
@@ -152,6 +155,7 @@ def main():
                 if val_loss < best_val - min_delta:
                     best_val = val_loss
                     bad_epochs = 0
+                    torch.save({"model": model.state_dict(), "stats": train_ds.stats}, ckpt_path)
                 else:
                     bad_epochs += 1
                     if bad_epochs >= patience:
