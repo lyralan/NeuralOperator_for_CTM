@@ -8,3 +8,5 @@ outputs/
 *.pt
 *.pth
 *.egg-info/
+!src/ntops/data/
+!src/ntops/data/**
