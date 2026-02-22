@@ -64,10 +64,25 @@ def main():
         n_val = int(n_total * val_split)
         val_indices = indices[:n_val]
         train_indices = indices[n_val:]
-        train_ds = NPZTrajectoryDataset(cfg["data_path"], normalize=False, indices=train_indices)
-        val_ds = NPZTrajectoryDataset(cfg["data_path"], normalize=False, indices=val_indices)
+        train_ds = NPZTrajectoryDataset(
+            cfg["data_path"],
+            normalize=False,
+            indices=train_indices,
+            return_traj=cfg["train"].get("unroll_steps", 1) > 1,
+        )
+        val_ds = NPZTrajectoryDataset(
+            cfg["data_path"],
+            normalize=False,
+            indices=val_indices,
+            return_traj=cfg["train"].get("unroll_steps", 1) > 1,
+        )
     else:
-        train_ds, val_ds = NPZTrajectoryDataset(cfg["data_path"], normalize=False), None
+        train_ds = NPZTrajectoryDataset(
+            cfg["data_path"],
+            normalize=False,
+            return_traj=cfg["train"].get("unroll_steps", 1) > 1,
+        )
+        val_ds = None
 
     if cfg["train"].get("normalize", True):
         stats = train_ds.compute_stats()
@@ -146,10 +161,13 @@ def main():
     min_delta = cfg["train"].get("early_stopping", {}).get("min_delta", 0.0)
     bad_epochs = 0
 
+    unroll_steps = cfg["train"].get("unroll_steps", 1)
+    step_stride = cfg["train"].get("step_stride", 1)
+
     for ep in range(1, epochs + 1):
-        loss = train_epoch(model, train_loader, optimizer, device)
+        loss = train_epoch(model, train_loader, optimizer, device, unroll_steps=unroll_steps, step_stride=step_stride)
         if val_loader is not None:
-            val_loss = eval_epoch(model, val_loader, device)
+            val_loss = eval_epoch(model, val_loader, device, unroll_steps=unroll_steps, step_stride=step_stride)
             print(f"Epoch {ep:03d} | train_loss={loss:.6f} | val_loss={val_loss:.6f}")
             if patience > 0:
                 if val_loss < best_val - min_delta:
@@ -183,7 +201,7 @@ def main():
 
         # denormalize if needed
         if train_ds.normalize:
-            m, s = train_ds.stats["y"]
+            m, s = train_ds.stats["c"]
             pred = pred * s + m
             y = y * s + m
 

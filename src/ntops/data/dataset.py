@@ -30,6 +30,7 @@ class NPZTrajectoryDataset(Dataset):
         normalize: bool = True,
         stats: dict | None = None,
         indices: np.ndarray | None = None,
+        return_traj: bool = False,
     ):
         data = load_npz(path)
         if indices is not None:
@@ -47,6 +48,7 @@ class NPZTrajectoryDataset(Dataset):
             self.S = data["S"]
             self.traj = data["traj"]
         self.normalize = normalize
+        self.return_traj = return_traj
 
         if stats is None:
             self.stats = self.compute_stats()
@@ -61,6 +63,7 @@ class NPZTrajectoryDataset(Dataset):
             S = self.S
             y = self.traj[:, -1]
             D = self.D
+            c = self.traj
         else:
             c0 = self.c0[indices]
             u = self.u[indices]
@@ -68,8 +71,10 @@ class NPZTrajectoryDataset(Dataset):
             S = self.S[indices]
             y = self.traj[indices, -1]
             D = self.D[indices]
+            c = self.traj[indices]
 
         stats = {
+            "c": _stats(c),
             "c0": _stats(c0),
             "u": _stats(u),
             "v": _stats(v),
@@ -98,7 +103,7 @@ class NPZTrajectoryDataset(Dataset):
         y = torch.from_numpy(self.traj[idx, -1]).float()
 
         if self.normalize:
-            m, s = self.stats["c0"]
+            m, s = self.stats["c"]
             c0 = (c0 - m) / s
             m, s = self.stats["u"]
             u = (u - m) / s
@@ -106,8 +111,17 @@ class NPZTrajectoryDataset(Dataset):
             v = (v - m) / s
             m, s = self.stats["S"]
             S = (S - m) / s
-            m, s = self.stats["y"]
+            m, s = self.stats["c"]
             y = (y - m) / s
             m, s = self.stats["D"]
             D = (D - m) / s
-        return {"c0": c0, "u": u, "v": v, "D": D, "S": S, "y": y}
+            traj = None
+            if self.return_traj:
+                traj = (self.traj[idx] - m) / s
+        else:
+            traj = self.traj[idx] if self.return_traj else None
+
+        sample = {"c0": c0, "u": u, "v": v, "D": D, "S": S, "y": y}
+        if self.return_traj:
+            sample["traj"] = torch.from_numpy(traj).float()
+        return sample

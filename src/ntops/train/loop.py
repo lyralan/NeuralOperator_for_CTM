@@ -20,15 +20,36 @@ def make_batch_inputs(batch, device):
     return x, D, y
 
 
-def train_epoch(model, dataloader, optimizer, device):
+def train_epoch(model, dataloader, optimizer, device, unroll_steps=1, step_stride=1):
     model.train()
     total = 0.0
     n = 0
     for batch in dataloader:
         x, D, y = make_batch_inputs(batch, device)
-        # optional: concatenate D as channel if desired
-        pred = model(x)
-        loss = mse(pred, y)
+        if unroll_steps <= 1 or "traj" not in batch:
+            pred = model(x)
+            loss = mse(pred, y)
+        else:
+            traj = batch["traj"].to(device)  # [B, T, H, W]
+            max_steps = min(unroll_steps, (traj.size(1) - 1) // step_stride)
+            c = batch["c0"].unsqueeze(1).to(device)
+            loss = 0.0
+            for k in range(1, max_steps + 1):
+                xk = torch.cat(
+                    [
+                        c,
+                        batch["u"].unsqueeze(1).to(device),
+                        batch["v"].unsqueeze(1).to(device),
+                        batch["S"].unsqueeze(1).to(device),
+                        batch["D"].view(-1, 1, 1, 1).expand_as(c).to(device),
+                    ],
+                    dim=1,
+                )
+                pred = model(xk)
+                target = traj[:, k * step_stride].unsqueeze(1)
+                loss = loss + mse(pred, target)
+                c = pred
+            loss = loss / max_steps
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
@@ -37,15 +58,37 @@ def train_epoch(model, dataloader, optimizer, device):
     return total / max(n, 1)
 
 
-def eval_epoch(model, dataloader, device):
+def eval_epoch(model, dataloader, device, unroll_steps=1, step_stride=1):
     model.eval()
     total = 0.0
     n = 0
     with torch.no_grad():
         for batch in dataloader:
             x, D, y = make_batch_inputs(batch, device)
-            pred = model(x)
-            loss = mse(pred, y)
+            if unroll_steps <= 1 or "traj" not in batch:
+                pred = model(x)
+                loss = mse(pred, y)
+            else:
+                traj = batch["traj"].to(device)
+                max_steps = min(unroll_steps, (traj.size(1) - 1) // step_stride)
+                c = batch["c0"].unsqueeze(1).to(device)
+                loss = 0.0
+                for k in range(1, max_steps + 1):
+                    xk = torch.cat(
+                        [
+                            c,
+                            batch["u"].unsqueeze(1).to(device),
+                            batch["v"].unsqueeze(1).to(device),
+                            batch["S"].unsqueeze(1).to(device),
+                            batch["D"].view(-1, 1, 1, 1).expand_as(c).to(device),
+                        ],
+                        dim=1,
+                    )
+                    pred = model(xk)
+                    target = traj[:, k * step_stride].unsqueeze(1)
+                    loss = loss + mse(pred, target)
+                    c = pred
+                loss = loss / max_steps
             total += loss.item() * y.size(0)
             n += y.size(0)
     return total / max(n, 1)

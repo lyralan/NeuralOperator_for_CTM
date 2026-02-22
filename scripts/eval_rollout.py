@@ -89,6 +89,7 @@ def main():
     dt = float(pcfg.get("dt", 1e-3))
     nsteps = int(pcfg.get("nsteps", 200))
     rollout_steps = int(cfg.get("rollout_steps", 5))
+    step_stride = int(cfg.get("step_stride", nsteps))
 
     _, _, dx, dy = make_grid(nx, ny, lx, ly)
 
@@ -109,7 +110,7 @@ def main():
             Di = D[idx]
 
             # PDE truth with larger horizon
-            traj = solve(c, ui, vi, Di, Si, dx, dy, dt, nsteps * rollout_steps, save_every=nsteps)
+            traj = solve(c, ui, vi, Di, Si, dx, dy, dt, step_stride * rollout_steps, save_every=step_stride)
             # Prepend initial condition
             truth = [c] + [traj[k] for k in range(traj.shape[0])]
 
@@ -117,7 +118,7 @@ def main():
             for _ in range(rollout_steps):
                 c_in = c
                 if stats is not None:
-                    c_in = normalize_field(c_in, *stats["c0"])
+                    c_in = normalize_field(c_in, *stats["c"])
                     u_in = normalize_field(ui, *stats["u"])
                     v_in = normalize_field(vi, *stats["v"])
                     S_in = normalize_field(Si, *stats["S"])
@@ -132,7 +133,7 @@ def main():
                 pred = pred[0, 0].cpu().numpy()
 
                 if stats is not None:
-                    pred = denormalize_field(pred, *stats["y"])
+                    pred = denormalize_field(pred, *stats["c"])
 
                 c = pred
                 preds.append(c)
