@@ -103,21 +103,20 @@ class NPZTrajectoryDataset(Dataset):
         y = torch.from_numpy(self.traj[idx, -1]).float()
 
         if self.normalize:
-            m, s = self.stats["c"]
-            c0 = (c0 - m) / s
+            c_m, c_s = self.stats["c"]
+            c0 = (c0 - c_m) / c_s
             m, s = self.stats["u"]
             u = (u - m) / s
             m, s = self.stats["v"]
             v = (v - m) / s
             m, s = self.stats["S"]
             S = (S - m) / s
-            m, s = self.stats["c"]
-            y = (y - m) / s
+            y = (y - c_m) / c_s
             m, s = self.stats["D"]
             D = (D - m) / s
             traj = None
             if self.return_traj:
-                traj = (self.traj[idx] - m) / s
+                traj = (self.traj[idx] - c_m) / c_s
         else:
             traj = self.traj[idx] if self.return_traj else None
 
