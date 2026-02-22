@@ -1,0 +1,15 @@
+data_path: data/train_dataset.npz
+model:
+  type: hybrid
+  in_channels: 5
+train:
+  batch_size: 8
+  epochs: 5
+  lr: 0.001
+  weight_decay: 0.0
+  device: cpu
+  normalize: true
+  val_split: 0.1
+  seed: 0
+  plot_predictions: true
+  plot_dir: outputs

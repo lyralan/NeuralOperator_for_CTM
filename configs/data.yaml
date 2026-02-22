@@ -1,0 +1,11 @@
+output_path: data/train_dataset.npz
+nx: 64
+ny: 64
+lx: 1.0
+ly: 1.0
+dt: 0.001
+nsteps: 200
+nsamples: 2000
+D_range: [0.0001, 0.01]
+wind_scale: 1.0
+seed: 0

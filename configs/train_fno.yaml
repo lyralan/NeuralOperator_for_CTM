@@ -1,0 +1,29 @@
+data_path: data/train_dataset.npz
+model:
+  type: fno
+  in_channels: 5
+  out_channels: 1
+  width: 32
+  modes1: 12
+  modes2: 12
+  depth: 4
+train:
+  batch_size: 64
+  epochs: 50
+  lr: 0.0001
+  weight_decay: 0.0003
+  device: cpu
+  normalize: true
+  val_split: 0.1
+  seed: 0
+  plot_predictions: true
+  plot_dir: outputs
+  num_workers: 24
+  pin_memory: false
+  scheduler:
+    type: step
+    step_size: 10
+    gamma: 0.5
+  early_stopping:
+    patience: 8
+    min_delta: 0.0005

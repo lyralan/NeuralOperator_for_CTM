@@ -1,0 +1,3 @@
+data_path: data/train_dataset.npz
+steps: 50
+lr: 0.01
