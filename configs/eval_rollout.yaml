@@ -3,7 +3,7 @@ model_config: configs/train_fno.yaml
 checkpoint: outputs/best.pt
 # data config to get dt/nsteps/grid
 pde_config: configs/data.yaml
-rollout_steps: 5
+rollout_steps: 20
 step_stride: 10
 sample_indices: [0, 1, 2]
 device: cpu
