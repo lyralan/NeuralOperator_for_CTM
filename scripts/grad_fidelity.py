@@ -80,10 +80,6 @@ def main():
     D = data["D"][idx]
     S_true = data["S"][idx]
 
-    c0_obs = data["c0"][obs_idx]
-    u_obs = data["u"][obs_idx]
-    v_obs = data["v"][obs_idx]
-    D_obs = data["D"][obs_idx]
     S_obs = data["S"][obs_idx]
 
     nx = int(pcfg.get("nx", 64))
@@ -104,10 +100,10 @@ def main():
     max_t = max(obs_times)
     total_steps = max_t * nsteps_multiplier
     obs_traj = solve(
-        c0_obs,
-        u_obs,
-        v_obs,
-        D_obs,
+        c0,
+        u,
+        v,
+        D,
         S_obs * s_scale,
         dx,
         dy,
@@ -154,20 +150,40 @@ def main():
         c_std = 1.0
         s_std = 1.0
 
-    # Surrogate gradient via autograd
+    # Surrogate gradient via autograd (rollout)
     model.eval()
     Sn_t = torch.tensor(Sn, dtype=torch.float32, device=device, requires_grad=True)
-    x = np.stack([c0n, un, vn, Sn, np.ones_like(Sn) * Dn], axis=0)
-    x = torch.from_numpy(x[None]).float().to(device)
-    x = x.clone()
-    x[:, 3] = Sn_t
+    step_stride = int(cfg.get("sur_step_stride", 10))
+    x0 = np.stack([c0n, un, vn, Sn, np.ones_like(Sn) * Dn], axis=0)
+    x0 = torch.from_numpy(x0[None]).float().to(device)
+    x0 = x0.clone()
+    x0[:, 3] = Sn_t
 
     with torch.enable_grad():
-        pred = model(x)[0, 0]
-        if stats is not None:
-            pred = denormalize(pred, c_mean, c_std)
+        if any(t % step_stride != 0 for t in obs_times):
+            raise ValueError("obs_times must be multiples of sur_step_stride for surrogate rollout.")
         loss = 0.0
-        for o in obs_list:
+        c = x0[:, 0:1]
+        obs_pairs = sorted(zip(obs_times, obs_list), key=lambda x: x[0])
+        last_step = 0
+        for t, o in obs_pairs:
+            steps = int(t / step_stride)
+            for _ in range(steps - last_step):
+                xk = torch.cat(
+                    [
+                        c,
+                        x0[:, 1:2],
+                        x0[:, 2:3],
+                        x0[:, 3:4],
+                        x0[:, 4:5],
+                    ],
+                    dim=1,
+                )
+                c = model(xk)
+            last_step = steps
+            pred = c[0, 0]
+            if stats is not None:
+                pred = denormalize(pred, c_mean, c_std)
             loss = loss + torch.sum((pred - torch.tensor(o, device=device)) ** 2)
         loss.backward()
         grad_sur = Sn_t.grad.detach().cpu().numpy() / s_std  # dL/dS (physical units)
