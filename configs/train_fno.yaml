@@ -20,7 +20,7 @@ train:
   plot_dir: outputs
   checkpoint_path: outputs/best.pt
   unroll_steps: 4
-  step_stride: 5
+  step_stride: 2
   num_workers: 24
   pin_memory: false
   scheduler:
