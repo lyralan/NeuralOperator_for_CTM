@@ -74,6 +74,7 @@ def main():
     idx = int(cfg.get("sample_index", 0))
     obs_idx = int(cfg.get("obs_index", idx))
     obs_mode = cfg.get("obs_mode", "perturb")
+    rng = np.random.default_rng(int(cfg.get("seed", 0)))
 
     c0 = data["c0"][idx]
     u = data["u"][idx]
@@ -135,7 +136,6 @@ def main():
     stats = ckpt.get("stats", None)
 
     # Prepare normalized inputs for surrogate
-    rng = np.random.default_rng(int(cfg.get("seed", 0)))
     init_noise_std = float(cfg.get("init_noise_std", 0.0))
     S_init = S_true + rng.standard_normal(S_true.shape) * init_noise_std
 
