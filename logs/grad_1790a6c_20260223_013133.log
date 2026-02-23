@@ -1,0 +1,24 @@
+Gradient fidelity (subset):
+  sur_loss_sse: 15.139922776280962
+  surrogate_fd_check:
+    cosine_similarity: 0.7605316638946533
+    rel_l2: 0.7749772667884827
+  fd_eps_scale: 1e-2
+    cosine_similarity: -0.9657900333404541
+    rel_l2: 1.0002444982528687
+    rel_l2_scaled: 0.2594233453273773
+    fd_mean_abs: 0.10142539815760471
+    sur_mean_abs: 4.246547177899629e-05
+  fd_eps_scale: 1e-1
+    cosine_similarity: -0.9657900333404541
+    rel_l2: 1.0002444982528687
+    rel_l2_scaled: 0.2594233453273773
+    fd_mean_abs: 0.10142539815766635
+    sur_mean_abs: 4.246547177899629e-05
+  fd_eps_scale: 5e-1
+    cosine_similarity: -0.9657900333404541
+    rel_l2: 1.0002444982528687
+    rel_l2_scaled: 0.2594233453273773
+    fd_mean_abs: 0.10142539815766374
+    sur_mean_abs: 4.246547177899629e-05
+  runtime_sec: 783.161
