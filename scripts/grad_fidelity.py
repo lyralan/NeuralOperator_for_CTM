@@ -85,11 +85,16 @@ def main():
     ly = float(pcfg.get("ly", 1.0))
     dt = float(pcfg.get("dt", 1e-3))
     nsteps = int(pcfg.get("nsteps", 200))
+    nsteps_multiplier = int(cfg.get("nsteps_multiplier", 1))
     _, _, dx, dy = make_grid(nx, ny, lx, ly)
 
-    # "True" observation from PDE
+    s_scale = float(cfg.get("S_scale", 1.0))
+    S_true = S_true * s_scale
+
     # Observations generated from true source
-    obs = solve(c0, u, v, D, S_true, dx, dy, dt, nsteps, save_every=nsteps)[-1]
+    obs = solve(
+        c0, u, v, D, S_true, dx, dy, dt, nsteps * nsteps_multiplier, save_every=nsteps * nsteps_multiplier
+    )[-1]
 
     # Load model + stats
     model = build_model(mcfg)
@@ -159,12 +164,16 @@ def main():
             S_perturb = S_init.copy().reshape(-1)
             S_perturb[fi] += eps
             S_perturb = S_perturb.reshape(S_init.shape)
-            obs_p = solve(c0, u, v, D, S_perturb, dx, dy, dt, nsteps, save_every=nsteps)[-1]
+            obs_p = solve(
+                c0, u, v, D, S_perturb, dx, dy, dt, nsteps * nsteps_multiplier, save_every=nsteps * nsteps_multiplier
+            )[-1]
             loss_p = sse(obs_p, obs)
             S_perturb = S_init.copy().reshape(-1)
             S_perturb[fi] -= eps
             S_perturb = S_perturb.reshape(S_init.shape)
-            obs_m = solve(c0, u, v, D, S_perturb, dx, dy, dt, nsteps, save_every=nsteps)[-1]
+            obs_m = solve(
+                c0, u, v, D, S_perturb, dx, dy, dt, nsteps * nsteps_multiplier, save_every=nsteps * nsteps_multiplier
+            )[-1]
             loss_m = sse(obs_m, obs)
             grad_fd[i] = (loss_p - loss_m) / (2 * eps)
 
