@@ -110,7 +110,7 @@ def main():
         s_std = stats["S"][1]
     else:
         s_std = np.std(S_true) + 1e-8
-    eps = float(cfg.get("fd_eps", 1e-3)) * s_std
+    fd_eps_list = cfg.get("fd_eps_list", [cfg.get("fd_eps", 1e-3)])
 
     if stats is not None:
         c0n = normalize(c0, *stats["c"])
@@ -146,35 +146,43 @@ def main():
     rng = np.random.default_rng(int(cfg.get("seed", 0)))
     n_points = int(cfg.get("fd_points", 50))
     flat_idx = rng.choice(S_true.size, size=n_points, replace=False)
-
-    grad_fd = np.zeros(n_points, dtype=np.float64)
-    for i, fi in enumerate(flat_idx):
-        S_perturb = S_init.copy().reshape(-1)
-        S_perturb[fi] += eps
-        S_perturb = S_perturb.reshape(S_init.shape)
-        obs_p = solve(c0, u, v, D, S_perturb, dx, dy, dt, nsteps, save_every=nsteps)[-1]
-        loss_p = sse(obs_p, obs)
-        S_perturb = S_init.copy().reshape(-1)
-        S_perturb[fi] -= eps
-        S_perturb = S_perturb.reshape(S_init.shape)
-        obs_m = solve(c0, u, v, D, S_perturb, dx, dy, dt, nsteps, save_every=nsteps)[-1]
-        loss_m = sse(obs_m, obs)
-        grad_fd[i] = (loss_p - loss_m) / (2 * eps)
-
     grad_sur_sample = grad_sur.reshape(-1)[flat_idx]
-
-    grad_fd_t = torch.tensor(grad_fd, dtype=torch.float32)
     grad_sur_t = torch.tensor(grad_sur_sample, dtype=torch.float32)
 
-    cos = cosine_similarity(grad_fd_t, grad_sur_t).item()
-    rel_l2 = (torch.norm(grad_fd_t - grad_sur_t) / (torch.norm(grad_fd_t) + 1e-8)).item()
-
     print("Gradient fidelity (subset):")
-    print("  cosine_similarity:", cos)
-    print("  rel_l2:", rel_l2)
-    print("  fd_mean_abs:", float(np.mean(np.abs(grad_fd))))
-    print("  sur_mean_abs:", float(np.mean(np.abs(grad_sur_sample))))
     print("  sur_loss_sse:", float(sur_loss))
+
+    for eps_scale in fd_eps_list:
+        eps = float(eps_scale) * s_std
+        grad_fd = np.zeros(n_points, dtype=np.float64)
+        for i, fi in enumerate(flat_idx):
+            S_perturb = S_init.copy().reshape(-1)
+            S_perturb[fi] += eps
+            S_perturb = S_perturb.reshape(S_init.shape)
+            obs_p = solve(c0, u, v, D, S_perturb, dx, dy, dt, nsteps, save_every=nsteps)[-1]
+            loss_p = sse(obs_p, obs)
+            S_perturb = S_init.copy().reshape(-1)
+            S_perturb[fi] -= eps
+            S_perturb = S_perturb.reshape(S_init.shape)
+            obs_m = solve(c0, u, v, D, S_perturb, dx, dy, dt, nsteps, save_every=nsteps)[-1]
+            loss_m = sse(obs_m, obs)
+            grad_fd[i] = (loss_p - loss_m) / (2 * eps)
+
+        grad_fd_t = torch.tensor(grad_fd, dtype=torch.float32)
+        cos = cosine_similarity(grad_fd_t, grad_sur_t).item()
+        rel_l2 = (torch.norm(grad_fd_t - grad_sur_t) / (torch.norm(grad_fd_t) + 1e-8)).item()
+
+        # Scale-matched rel-L2
+        alpha = (grad_fd_t @ grad_sur_t) / (grad_sur_t @ grad_sur_t + 1e-8)
+        rel_l2_scaled = (torch.norm(grad_fd_t - alpha * grad_sur_t) / (torch.norm(grad_fd_t) + 1e-8)).item()
+
+        print(f"  fd_eps_scale: {eps_scale}")
+        print("    cosine_similarity:", cos)
+        print("    rel_l2:", rel_l2)
+        print("    rel_l2_scaled:", rel_l2_scaled)
+        print("    fd_mean_abs:", float(np.mean(np.abs(grad_fd))))
+        print("    sur_mean_abs:", float(np.mean(np.abs(grad_sur_sample))))
+
     print("  runtime_sec:", round(time.time() - t0, 3))
 
 
