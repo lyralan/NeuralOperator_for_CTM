@@ -102,6 +102,7 @@ def main():
     obs_times = cfg.get("obs_times", [nsteps])
     obs_times = [int(t) for t in obs_times]
     max_t = max(obs_times)
+    total_steps = max_t * nsteps_multiplier
     obs_traj = solve(
         c0_obs,
         u_obs,
@@ -111,14 +112,13 @@ def main():
         dx,
         dy,
         dt,
-        max_t * nsteps_multiplier,
-        save_every=nsteps * nsteps_multiplier,
+        total_steps,
+        save_every=1,
     )
-    # Map obs_times to indices in the saved trajectory
-    obs_map = {t: int(t / nsteps) - 1 for t in obs_times if t % nsteps == 0}
-    obs_list = [obs_traj[obs_map[t]] for t in obs_times if t in obs_map]
-    if len(obs_list) == 0:
-        raise ValueError("obs_times must be multiples of nsteps (e.g., 50,100,200 when nsteps=50).")
+    obs_idx = [t - 1 for t in obs_times]
+    if min(obs_idx) < 0 or max(obs_idx) >= obs_traj.shape[0]:
+        raise ValueError("obs_times must be between 1 and total_steps.")
+    obs_list = [obs_traj[i] for i in obs_idx]
 
     # Load model + stats
     model = build_model(mcfg)
@@ -191,21 +191,19 @@ def main():
             S_perturb[fi] += eps
             S_perturb = S_perturb.reshape(S_init.shape)
             obs_p = solve(
-                c0, u, v, D, S_perturb, dx, dy, dt, max_t * nsteps_multiplier, save_every=nsteps * nsteps_multiplier
+                c0, u, v, D, S_perturb, dx, dy, dt, total_steps, save_every=1
             )
             loss_p = 0.0
-            for o_t, o_true in zip(obs_times, obs_list):
-                idx_t = obs_map[o_t]
+            for idx_t, o_true in zip(obs_idx, obs_list):
                 loss_p = loss_p + sse(obs_p[idx_t], o_true)
             S_perturb = S_init.copy().reshape(-1)
             S_perturb[fi] -= eps
             S_perturb = S_perturb.reshape(S_init.shape)
             obs_m = solve(
-                c0, u, v, D, S_perturb, dx, dy, dt, max_t * nsteps_multiplier, save_every=nsteps * nsteps_multiplier
+                c0, u, v, D, S_perturb, dx, dy, dt, total_steps, save_every=1
             )
             loss_m = 0.0
-            for o_t, o_true in zip(obs_times, obs_list):
-                idx_t = obs_map[o_t]
+            for idx_t, o_true in zip(obs_idx, obs_list):
                 loss_m = loss_m + sse(obs_m[idx_t], o_true)
             grad_fd[i] = (loss_p - loss_m) / (2 * eps)
 
