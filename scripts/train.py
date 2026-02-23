@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import time
 import yaml
 import torch
 from torch.utils.data import DataLoader
@@ -47,6 +48,7 @@ def build_model(cfg):
 
 
 def main():
+    t0 = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
     args = parser.parse_args()
@@ -219,6 +221,8 @@ def main():
             fig.tight_layout()
             fig.savefig(os.path.join(plot_dir, f"pred_vs_true_{i}.png"), dpi=150)
             plt.close(fig)
+
+    print(f"runtime_sec: {round(time.time() - t0, 3)}")
 
 
 if __name__ == "__main__":

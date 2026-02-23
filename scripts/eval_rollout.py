@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import time
 import yaml
 import numpy as np
 import torch
@@ -53,6 +54,7 @@ def denormalize_field(x, mean, std):
 
 
 def main():
+    t0 = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
     args = parser.parse_args()
@@ -153,6 +155,7 @@ def main():
 
     print("Rollout L2 per step (mean):", per_step_l2.mean(axis=0))
     print("Rollout rel-L2 per step (mean):", per_step_rel.mean(axis=0))
+    print(f"runtime_sec: {round(time.time() - t0, 3)}")
 
 
 if __name__ == "__main__":
