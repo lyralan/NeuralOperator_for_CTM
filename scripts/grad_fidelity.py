@@ -45,8 +45,8 @@ def build_model(cfg):
     raise ValueError(f"Unknown model type: {mtype}")
 
 
-def mse(a, b):
-    return np.mean((a - b) ** 2)
+def sse(a, b):
+    return np.sum((a - b) ** 2)
 
 
 def normalize(x, mean, std):
@@ -137,9 +137,10 @@ def main():
         pred = model(x)[0, 0]
         if stats is not None:
             pred = denormalize(pred, c_mean, c_std)
-    loss = torch.mean((pred - torch.tensor(obs, device=device)) ** 2)
-    loss.backward()
-    grad_sur = Sn_t.grad.detach().cpu().numpy() / s_std  # dL/dS (physical units)
+        loss = torch.sum((pred - torch.tensor(obs, device=device)) ** 2)
+        loss.backward()
+        grad_sur = Sn_t.grad.detach().cpu().numpy() / s_std  # dL/dS (physical units)
+        sur_loss = loss.detach().cpu().item()
 
     # Finite-difference gradient on PDE for random subset of pixels
     rng = np.random.default_rng(int(cfg.get("seed", 0)))
@@ -152,12 +153,12 @@ def main():
         S_perturb[fi] += eps
         S_perturb = S_perturb.reshape(S_init.shape)
         obs_p = solve(c0, u, v, D, S_perturb, dx, dy, dt, nsteps, save_every=nsteps)[-1]
-        loss_p = mse(obs_p, obs)
+        loss_p = sse(obs_p, obs)
         S_perturb = S_init.copy().reshape(-1)
         S_perturb[fi] -= eps
         S_perturb = S_perturb.reshape(S_init.shape)
         obs_m = solve(c0, u, v, D, S_perturb, dx, dy, dt, nsteps, save_every=nsteps)[-1]
-        loss_m = mse(obs_m, obs)
+        loss_m = sse(obs_m, obs)
         grad_fd[i] = (loss_p - loss_m) / (2 * eps)
 
     grad_sur_sample = grad_sur.reshape(-1)[flat_idx]
@@ -173,6 +174,7 @@ def main():
     print("  rel_l2:", rel_l2)
     print("  fd_mean_abs:", float(np.mean(np.abs(grad_fd))))
     print("  sur_mean_abs:", float(np.mean(np.abs(grad_sur_sample))))
+    print("  sur_loss_sse:", float(sur_loss))
     print("  runtime_sec:", round(time.time() - t0, 3))
 
 
