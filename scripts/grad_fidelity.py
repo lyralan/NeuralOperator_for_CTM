@@ -72,12 +72,19 @@ def main():
 
     data = np.load(pcfg["output_path"])
     idx = int(cfg.get("sample_index", 0))
+    obs_idx = int(cfg.get("obs_index", idx))
 
     c0 = data["c0"][idx]
     u = data["u"][idx]
     v = data["v"][idx]
     D = data["D"][idx]
     S_true = data["S"][idx]
+
+    c0_obs = data["c0"][obs_idx]
+    u_obs = data["u"][obs_idx]
+    v_obs = data["v"][obs_idx]
+    D_obs = data["D"][obs_idx]
+    S_obs = data["S"][obs_idx]
 
     nx = int(pcfg.get("nx", 64))
     ny = int(pcfg.get("ny", 64))
@@ -92,9 +99,26 @@ def main():
     S_true = S_true * s_scale
 
     # Observations generated from true source
-    obs = solve(
-        c0, u, v, D, S_true, dx, dy, dt, nsteps * nsteps_multiplier, save_every=nsteps * nsteps_multiplier
-    )[-1]
+    obs_times = cfg.get("obs_times", [nsteps])
+    obs_times = [int(t) for t in obs_times]
+    max_t = max(obs_times)
+    obs_traj = solve(
+        c0_obs,
+        u_obs,
+        v_obs,
+        D_obs,
+        S_obs * s_scale,
+        dx,
+        dy,
+        dt,
+        max_t * nsteps_multiplier,
+        save_every=nsteps * nsteps_multiplier,
+    )
+    # Map obs_times to indices in the saved trajectory
+    obs_map = {t: int(t / nsteps) - 1 for t in obs_times if t % nsteps == 0}
+    obs_list = [obs_traj[obs_map[t]] for t in obs_times if t in obs_map]
+    if len(obs_list) == 0:
+        raise ValueError("obs_times must be multiples of nsteps (e.g., 50,100,200 when nsteps=50).")
 
     # Load model + stats
     model = build_model(mcfg)
@@ -142,7 +166,9 @@ def main():
         pred = model(x)[0, 0]
         if stats is not None:
             pred = denormalize(pred, c_mean, c_std)
-        loss = torch.sum((pred - torch.tensor(obs, device=device)) ** 2)
+        loss = 0.0
+        for o in obs_list:
+            loss = loss + torch.sum((pred - torch.tensor(o, device=device)) ** 2)
         loss.backward()
         grad_sur = Sn_t.grad.detach().cpu().numpy() / s_std  # dL/dS (physical units)
         sur_loss = loss.detach().cpu().item()
@@ -165,16 +191,22 @@ def main():
             S_perturb[fi] += eps
             S_perturb = S_perturb.reshape(S_init.shape)
             obs_p = solve(
-                c0, u, v, D, S_perturb, dx, dy, dt, nsteps * nsteps_multiplier, save_every=nsteps * nsteps_multiplier
-            )[-1]
-            loss_p = sse(obs_p, obs)
+                c0, u, v, D, S_perturb, dx, dy, dt, max_t * nsteps_multiplier, save_every=nsteps * nsteps_multiplier
+            )
+            loss_p = 0.0
+            for o_t, o_true in zip(obs_times, obs_list):
+                idx_t = obs_map[o_t]
+                loss_p = loss_p + sse(obs_p[idx_t], o_true)
             S_perturb = S_init.copy().reshape(-1)
             S_perturb[fi] -= eps
             S_perturb = S_perturb.reshape(S_init.shape)
             obs_m = solve(
-                c0, u, v, D, S_perturb, dx, dy, dt, nsteps * nsteps_multiplier, save_every=nsteps * nsteps_multiplier
-            )[-1]
-            loss_m = sse(obs_m, obs)
+                c0, u, v, D, S_perturb, dx, dy, dt, max_t * nsteps_multiplier, save_every=nsteps * nsteps_multiplier
+            )
+            loss_m = 0.0
+            for o_t, o_true in zip(obs_times, obs_list):
+                idx_t = obs_map[o_t]
+                loss_m = loss_m + sse(obs_m[idx_t], o_true)
             grad_fd[i] = (loss_p - loss_m) / (2 * eps)
 
         grad_fd_t = torch.tensor(grad_fd, dtype=torch.float32)
