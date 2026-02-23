@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import time
 import yaml
 import numpy as np
 import torch
@@ -57,6 +58,7 @@ def denormalize(x, mean, std):
 
 
 def main():
+    t0 = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument("--config", required=True)
     args = parser.parse_args()
@@ -171,6 +173,7 @@ def main():
     print("  rel_l2:", rel_l2)
     print("  fd_mean_abs:", float(np.mean(np.abs(grad_fd))))
     print("  sur_mean_abs:", float(np.mean(np.abs(grad_sur_sample))))
+    print("  runtime_sec:", round(time.time() - t0, 3))
 
 
 if __name__ == "__main__":
