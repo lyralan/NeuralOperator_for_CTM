@@ -73,6 +73,7 @@ def main():
     data = np.load(pcfg["output_path"])
     idx = int(cfg.get("sample_index", 0))
     obs_idx = int(cfg.get("obs_index", idx))
+    obs_mode = cfg.get("obs_mode", "perturb")
 
     c0 = data["c0"][idx]
     u = data["u"][idx]
@@ -99,6 +100,14 @@ def main():
     obs_times = [int(t) for t in obs_times]
     max_t = max(obs_times)
     total_steps = max_t * nsteps_multiplier
+    obs_noise_std = float(cfg.get("obs_noise_std", 0.0))
+    if obs_mode == "perturb":
+        S_obs = S_true + rng.standard_normal(S_true.shape) * obs_noise_std
+    elif obs_mode == "other_sample":
+        S_obs = S_obs
+    else:
+        raise ValueError("obs_mode must be 'perturb' or 'other_sample'.")
+
     obs_traj = solve(
         c0,
         u,
@@ -184,7 +193,10 @@ def main():
             pred = c[0, 0]
             if stats is not None:
                 pred = denormalize(pred, c_mean, c_std)
-            loss = loss + torch.sum((pred - torch.tensor(o, device=device)) ** 2)
+        loss = loss + torch.sum((pred - torch.tensor(o, device=device)) ** 2)
+        # Normalize by number of pixels and number of obs times to stabilize scale
+        norm = float(pred.numel() * len(obs_pairs))
+        loss = loss / norm
         loss.backward()
         grad_sur = Sn_t.grad.detach().cpu().numpy() / s_std  # dL/dS (physical units)
         sur_loss = loss.detach().cpu().item()
@@ -198,6 +210,72 @@ def main():
 
     print("Gradient fidelity (subset):")
     print("  sur_loss_sse:", float(sur_loss))
+
+    # Surrogate FD vs autograd sanity check (subset)
+    sur_fd_points = int(cfg.get("sur_fd_points", 50))
+    sur_fd_eps = float(cfg.get("sur_fd_eps", 1e-2)) * s_std
+    sur_flat_idx = rng.choice(S_true.size, size=sur_fd_points, replace=False)
+    sur_fd = np.zeros(sur_fd_points, dtype=np.float64)
+    for i, fi in enumerate(sur_flat_idx):
+        S_perturb = S_init.copy().reshape(-1)
+        S_perturb[fi] += sur_fd_eps
+        S_perturb = S_perturb.reshape(S_init.shape)
+        if stats is not None:
+            Sn_p = normalize(S_perturb, *stats["S"])
+        else:
+            Sn_p = S_perturb
+        x0p = x0.clone()
+        x0p[:, 3] = torch.tensor(Sn_p, dtype=torch.float32, device=device)
+        with torch.no_grad():
+            c = x0p[:, 0:1]
+            loss_p = 0.0
+            last_step = 0
+            for t, o in obs_pairs:
+                steps = int(t / step_stride)
+                for _ in range(steps - last_step):
+                    xk = torch.cat([c, x0p[:, 1:2], x0p[:, 2:3], x0p[:, 3:4], x0p[:, 4:5]], dim=1)
+                    c = model(xk)
+                last_step = steps
+                pred = c[0, 0]
+                if stats is not None:
+                    pred = denormalize(pred, c_mean, c_std)
+                loss_p = loss_p + torch.sum((pred - torch.tensor(o, device=device)) ** 2)
+            loss_p = loss_p / (pred.numel() * len(obs_pairs))
+
+        S_perturb = S_init.copy().reshape(-1)
+        S_perturb[fi] -= sur_fd_eps
+        S_perturb = S_perturb.reshape(S_init.shape)
+        if stats is not None:
+            Sn_m = normalize(S_perturb, *stats["S"])
+        else:
+            Sn_m = S_perturb
+        x0m = x0.clone()
+        x0m[:, 3] = torch.tensor(Sn_m, dtype=torch.float32, device=device)
+        with torch.no_grad():
+            c = x0m[:, 0:1]
+            loss_m = 0.0
+            last_step = 0
+            for t, o in obs_pairs:
+                steps = int(t / step_stride)
+                for _ in range(steps - last_step):
+                    xk = torch.cat([c, x0m[:, 1:2], x0m[:, 2:3], x0m[:, 3:4], x0m[:, 4:5]], dim=1)
+                    c = model(xk)
+                last_step = steps
+                pred = c[0, 0]
+                if stats is not None:
+                    pred = denormalize(pred, c_mean, c_std)
+                loss_m = loss_m + torch.sum((pred - torch.tensor(o, device=device)) ** 2)
+            loss_m = loss_m / (pred.numel() * len(obs_pairs))
+        sur_fd[i] = (loss_p.item() - loss_m.item()) / (2 * sur_fd_eps)
+
+    grad_sur_fd_sample = grad_sur.reshape(-1)[sur_flat_idx]
+    sur_fd_t = torch.tensor(sur_fd, dtype=torch.float32)
+    grad_sur_fd_t = torch.tensor(grad_sur_fd_sample, dtype=torch.float32)
+    sur_cos = cosine_similarity(sur_fd_t, grad_sur_fd_t).item()
+    sur_rel = (torch.norm(sur_fd_t - grad_sur_fd_t) / (torch.norm(sur_fd_t) + 1e-8)).item()
+    print("  surrogate_fd_check:")
+    print("    cosine_similarity:", sur_cos)
+    print("    rel_l2:", sur_rel)
 
     for eps_scale in fd_eps_list:
         eps = float(eps_scale) * s_std
@@ -221,6 +299,8 @@ def main():
             loss_m = 0.0
             for idx_t, o_true in zip(obs_idx, obs_list):
                 loss_m = loss_m + sse(obs_m[idx_t], o_true)
+            loss_p = loss_p / (obs_p.shape[1] * obs_p.shape[2] * len(obs_pairs))
+            loss_m = loss_m / (obs_m.shape[1] * obs_m.shape[2] * len(obs_pairs))
             grad_fd[i] = (loss_p - loss_m) / (2 * eps)
 
         grad_fd_t = torch.tensor(grad_fd, dtype=torch.float32)
