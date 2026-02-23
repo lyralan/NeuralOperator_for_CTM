@@ -75,7 +75,7 @@ def main():
     u = data["u"][idx]
     v = data["v"][idx]
     D = data["D"][idx]
-    S = data["S"][idx]
+    S_true = data["S"][idx]
 
     nx = int(pcfg.get("nx", 64))
     ny = int(pcfg.get("ny", 64))
@@ -86,7 +86,8 @@ def main():
     _, _, dx, dy = make_grid(nx, ny, lx, ly)
 
     # "True" observation from PDE
-    obs = solve(c0, u, v, D, S, dx, dy, dt, nsteps, save_every=nsteps)[-1]
+    # Observations generated from true source
+    obs = solve(c0, u, v, D, S_true, dx, dy, dt, nsteps, save_every=nsteps)[-1]
 
     # Load model + stats
     model = build_model(mcfg)
@@ -98,17 +99,27 @@ def main():
     stats = ckpt.get("stats", None)
 
     # Prepare normalized inputs for surrogate
+    rng = np.random.default_rng(int(cfg.get("seed", 0)))
+    init_noise_std = float(cfg.get("init_noise_std", 0.0))
+    S_init = S_true + rng.standard_normal(S_true.shape) * init_noise_std
+
+    # Scale FD epsilon by source std for numerical stability
+    if stats is not None:
+        s_std = stats["S"][1]
+    else:
+        s_std = np.std(S_true) + 1e-8
+    eps = float(cfg.get("fd_eps", 1e-3)) * s_std
+
     if stats is not None:
         c0n = normalize(c0, *stats["c"])
         un = normalize(u, *stats["u"])
         vn = normalize(v, *stats["v"])
-        Sn = normalize(S, *stats["S"])
+        Sn = normalize(S_init, *stats["S"])
         Dn = normalize(D, *stats["D"])
-        obs_n = normalize(obs, *stats["c"])
         c_mean, c_std = stats["c"]
         s_mean, s_std = stats["S"]
     else:
-        c0n, un, vn, Sn, Dn, obs_n = c0, u, v, S, D, obs
+        c0n, un, vn, Sn, Dn = c0, u, v, S_init, D
         c_std = 1.0
         s_std = 1.0
 
@@ -124,26 +135,25 @@ def main():
         pred = model(x)[0, 0]
         if stats is not None:
             pred = denormalize(pred, c_mean, c_std)
-        loss = torch.mean((pred - torch.tensor(obs, device=device)) ** 2)
-        loss.backward()
-        grad_sur = Sn_t.grad.detach().cpu().numpy() / s_std  # dL/dS (physical units)
+    loss = torch.mean((pred - torch.tensor(obs, device=device)) ** 2)
+    loss.backward()
+    grad_sur = Sn_t.grad.detach().cpu().numpy() / s_std  # dL/dS (physical units)
 
     # Finite-difference gradient on PDE for random subset of pixels
     rng = np.random.default_rng(int(cfg.get("seed", 0)))
     n_points = int(cfg.get("fd_points", 50))
-    eps = float(cfg.get("fd_eps", 1e-3))
-    flat_idx = rng.choice(S.size, size=n_points, replace=False)
+    flat_idx = rng.choice(S_true.size, size=n_points, replace=False)
 
     grad_fd = np.zeros(n_points, dtype=np.float64)
     for i, fi in enumerate(flat_idx):
-        S_perturb = S.copy().reshape(-1)
+        S_perturb = S_init.copy().reshape(-1)
         S_perturb[fi] += eps
-        S_perturb = S_perturb.reshape(S.shape)
+        S_perturb = S_perturb.reshape(S_init.shape)
         obs_p = solve(c0, u, v, D, S_perturb, dx, dy, dt, nsteps, save_every=nsteps)[-1]
         loss_p = mse(obs_p, obs)
-        S_perturb = S.copy().reshape(-1)
+        S_perturb = S_init.copy().reshape(-1)
         S_perturb[fi] -= eps
-        S_perturb = S_perturb.reshape(S.shape)
+        S_perturb = S_perturb.reshape(S_init.shape)
         obs_m = solve(c0, u, v, D, S_perturb, dx, dy, dt, nsteps, save_every=nsteps)[-1]
         loss_m = mse(obs_m, obs)
         grad_fd[i] = (loss_p - loss_m) / (2 * eps)
