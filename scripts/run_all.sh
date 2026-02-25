@@ -14,21 +14,24 @@ run_and_log() {
 }
 
 usage() {
-  echo "Usage: $0 [--train] [--rollout] [--grad]"
+  echo "Usage: $0 [--data] [--train] [--rollout] [--grad]"
   echo "If no flags are provided, all are run."
 }
 
+RUN_DATA=0
 RUN_TRAIN=0
 RUN_ROLLOUT=0
 RUN_GRAD=0
 
 if [[ $# -eq 0 ]]; then
+  RUN_DATA=1
   RUN_TRAIN=1
   RUN_ROLLOUT=1
   RUN_GRAD=1
 else
   while [[ $# -gt 0 ]]; do
     case "$1" in
+      --data) RUN_DATA=1 ;;
       --train) RUN_TRAIN=1 ;;
       --rollout) RUN_ROLLOUT=1 ;;
       --grad) RUN_GRAD=1 ;;
@@ -39,6 +42,9 @@ else
   done
 fi
 
+if [[ $RUN_DATA -eq 1 ]]; then
+  run_and_log data python scripts/make_data.py --config configs/data.yaml
+fi
 if [[ $RUN_TRAIN -eq 1 ]]; then
   run_and_log train python scripts/train.py --config configs/train_fno.yaml
 fi
