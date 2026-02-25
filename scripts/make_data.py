@@ -32,6 +32,7 @@ def main():
         wind_scale=cfg.get("wind_scale", 1.0),
         seed=cfg.get("seed", 0),
         save_every=cfg.get("save_every", 1),
+        num_workers=cfg.get("num_workers", 0),
     )
 
     print(f"Saved dataset to {out_path}")

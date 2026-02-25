@@ -10,3 +10,4 @@ nsamples: 2000
 D_range: [0.005, 0.05]
 wind_scale: 1.0
 seed: 0
+num_workers: 0    # 0 = use all CPU cores
