@@ -8,9 +8,9 @@ fd_eps_list: [1e-2, 1e-1, 5e-1]
 fd_points: 50
 init_noise_std: 0.2
 S_scale: 10.0
-nsteps_multiplier: 5
-obs_times: [10, 20, 40]
-sur_step_stride: 2
+nsteps_multiplier: 1
+obs_times: [50, 100, 200]
+sur_step_stride: 25
 obs_mode: perturb   # perturb | other_sample
 obs_noise_std: 0.5
 sur_fd_points: 50

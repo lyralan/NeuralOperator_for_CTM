@@ -21,6 +21,7 @@ def generate_dataset(
     D_range=(1e-4, 1e-2),
     wind_scale: float = 1.0,
     seed: int = 0,
+    save_every: int = 1,
 ):
     X, Y, dx, dy = make_grid(nx, ny, lx, ly)
     rng = np.random.default_rng(seed)
@@ -38,7 +39,7 @@ def generate_dataset(
         c0 = random_initial_condition(X, Y, seed=rng.integers(1e9))
         D = rng.uniform(D_range[0], D_range[1])
 
-        traj = solve(c0, u, v, D, S, dx, dy, dt, nsteps, save_every=1)
+        traj = solve(c0, u, v, D, S, dx, dy, dt, nsteps, save_every=save_every)
 
         c0s[i] = c0
         us[i] = u

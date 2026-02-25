@@ -31,6 +31,7 @@ def main():
         D_range=tuple(cfg.get("D_range", [1e-4, 1e-2])),
         wind_scale=cfg.get("wind_scale", 1.0),
         seed=cfg.get("seed", 0),
+        save_every=cfg.get("save_every", 1),
     )
 
     print(f"Saved dataset to {out_path}")

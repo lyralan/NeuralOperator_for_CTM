@@ -39,6 +39,6 @@ def solve(c0, u, v, D, S, dx, dy, dt, nsteps, save_every=1):
     for step in range(nsteps):
         c = rk4_step(c, t, dt, rhs)
         t += dt
-        if step % save_every == 0:
+        if (step + 1) % save_every == 0:
             traj.append(c.copy())
     return np.stack(traj, axis=0)
