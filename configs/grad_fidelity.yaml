@@ -9,7 +9,7 @@ fd_points: 50
 init_noise_std: 0.2
 S_scale: 50.0
 nsteps_multiplier: 1
-obs_times: [200, 500, 1000]
+obs_times: [200]
 sur_step_stride: 25
 obs_mode: perturb   # perturb | other_sample
 obs_noise_std: 0.5

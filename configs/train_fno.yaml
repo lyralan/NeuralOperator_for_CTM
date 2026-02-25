@@ -19,7 +19,7 @@ train:
   plot_predictions: true
   plot_dir: outputs
   checkpoint_path: outputs/best.pt
-  unroll_steps: 8
+  unroll_steps: 16
   step_stride: 1
   num_workers: 24
   pin_memory: false
