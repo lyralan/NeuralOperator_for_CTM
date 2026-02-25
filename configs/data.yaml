@@ -7,6 +7,6 @@ dt: 0.001
 nsteps: 2000
 save_every: 25
 nsamples: 2000
-D_range: [0.0001, 0.01]
+D_range: [0.005, 0.05]
 wind_scale: 1.0
 seed: 0
