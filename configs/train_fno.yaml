@@ -9,7 +9,7 @@ model:
   depth: 4
 train:
   batch_size: 64
-  epochs: 50
+  epochs: 100
   lr: 0.0001
   weight_decay: 0.0003
   device: cpu
@@ -19,7 +19,7 @@ train:
   plot_predictions: true
   plot_dir: outputs
   checkpoint_path: outputs/best.pt
-  unroll_steps: 16
+  unroll_steps: 24
   step_stride: 1
   num_workers: 24
   pin_memory: false
@@ -28,5 +28,5 @@ train:
     step_size: 10
     gamma: 0.5
   early_stopping:
-    patience: 8
-    min_delta: 0.0005
+    patience: 15
+    min_delta: 0.0001
