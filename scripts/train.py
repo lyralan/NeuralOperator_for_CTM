@@ -165,9 +165,12 @@ def main():
 
     unroll_steps = cfg["train"].get("unroll_steps", 1)
     step_stride = cfg["train"].get("step_stride", 1)
+    jacobian_weight = cfg["train"].get("jacobian_weight", 0.0)
+    jacobian_eps = cfg["train"].get("jacobian_eps", 0.01)
 
     for ep in range(1, epochs + 1):
-        loss = train_epoch(model, train_loader, optimizer, device, unroll_steps=unroll_steps, step_stride=step_stride)
+        loss = train_epoch(model, train_loader, optimizer, device, unroll_steps=unroll_steps, step_stride=step_stride,
+                           jacobian_weight=jacobian_weight, jacobian_eps=jacobian_eps)
         if val_loader is not None:
             val_loss = eval_epoch(model, val_loader, device, unroll_steps=unroll_steps, step_stride=step_stride)
             print(f"Epoch {ep:03d} | train_loss={loss:.6f} | val_loss={val_loss:.6f}")

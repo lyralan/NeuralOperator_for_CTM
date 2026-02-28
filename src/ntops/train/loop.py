@@ -20,7 +20,8 @@ def make_batch_inputs(batch, device):
     return x, D, y
 
 
-def train_epoch(model, dataloader, optimizer, device, unroll_steps=1, step_stride=1):
+def train_epoch(model, dataloader, optimizer, device, unroll_steps=1, step_stride=1,
+                jacobian_weight=0.0, jacobian_eps=0.01):
     model.train()
     total = 0.0
     n = 0
@@ -29,6 +30,7 @@ def train_epoch(model, dataloader, optimizer, device, unroll_steps=1, step_strid
         if unroll_steps <= 1 or "traj" not in batch:
             pred = model(x)
             loss = mse(pred, y)
+            last_input = x
         else:
             traj = batch["traj"].to(device)  # [B, T, H, W]
             max_steps = min(unroll_steps, (traj.size(1) - 1) // step_stride)
@@ -50,6 +52,15 @@ def train_epoch(model, dataloader, optimizer, device, unroll_steps=1, step_strid
                 loss = loss + mse(pred, target)
                 c = pred
             loss = loss / max_steps
+            last_input = xk
+        # Jacobian sensitivity loss: penalize the model for ignoring S
+        if jacobian_weight > 0:
+            delta = jacobian_eps * torch.randn_like(last_input[:, 3:4])
+            x_pert = last_input.clone()
+            x_pert[:, 3:4] = last_input[:, 3:4] + delta
+            pred_pert = model(x_pert)
+            diff_sq = torch.mean((pred_pert - pred.detach()) ** 2)
+            loss = loss + jacobian_weight * (-torch.log(diff_sq + 1e-8))
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
